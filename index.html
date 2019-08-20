@@ -1,0 +1,196 @@
+<!doctype html>
+<html>
+    <title>Password generator</title>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+        <link rel="stylesheet" type="text/css" href="bootstrap/css/bootstrap.min.css">
+        <style>
+            input.generated-password {
+                font-size: 29px;
+            }
+
+            .btn {
+                font-size: 29px;
+            }
+
+            .form-inline .checkbox {
+                padding: 3px;
+            }
+
+            .form-inline .checkbox input[type=checkbox] {
+                float: none;
+                margin: 0 6px 0 6px;
+            }
+
+            .dictionary-information input {
+                margin-right: 4px;
+            }
+
+            .form-group {
+                margin-bottom: 10px;
+            }
+        </style>
+        <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.3/jquery.min.js"></script>
+        <script src="dictionary.js"></script>
+        <script>
+
+            var phraseLength = 4;
+            var minWeight = 2000;
+            var minLength = 4;
+            var maxLength = 8;
+            var attackFrequency = 1000000;
+            var words = [];
+            var longestWord = 0;
+
+            var generateDictionary = function() {
+                minLength = $('.min-length').val();
+                maxLength = $('.max-length').val();
+                minWeight = $('.min-weight').val().replace(/,/g, '');
+
+                words = dictionary
+                    .map(function(data) { return {word: data[0], weight: data[1]}; })
+                    .filter(function(data) { return data.weight >= minWeight; })
+                    .filter(function(data) { return data.word.length >= minLength })
+                    .filter(function(data) { return data.word.length <= maxLength });
+
+                longestWord = 0;
+                words.map(function(data) {
+                    longestWord = Math.max(data.word.length, longestWord);
+                });
+
+                $('.dictionary-size .size').text(words.length);
+
+                $('.generate').toggleClass('disabled', words.length === 0);
+            };
+
+            var updateForm = function() {
+                $('.min-weight').val(formatNumber(minWeight));
+                $('.attack-frequency').val(formatNumber(attackFrequency));
+            };
+
+            var formatNumber = function(number) {
+                return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+            };
+
+            var generatePassword = function() {
+                if (!window.crypto || !window.crypto.getRandomValues) {
+                    return $('.unsupported-error').removeClass('d-none');
+                }
+
+                var passwordWords = [];
+                var randomNumbers = window.crypto.getRandomValues(new Uint16Array(phraseLength));
+                var max = Math.pow(2, 16);
+
+                for (i = 0; i < phraseLength; i++) {
+                    passwordWords.push(words[Math.floor(randomNumbers[i] / max * words.length)].word);
+                }
+                var capitaliseWord = $('.capitalise-word').prop('checked');
+                if (capitaliseWord) {
+                    var wordIndex = randomNumbers[0] % passwordWords.length;
+                    passwordWords[wordIndex] = passwordWords[wordIndex].toUpperCase();
+                }
+                var includeNumber = $('.include-number').prop('checked');
+                if (includeNumber) {
+                    var number = randomNumbers[1] % 100;
+                    var numberIndex = randomNumbers[1] % passwordWords.length;
+                    passwordWords[numberIndex] = passwordWords[numberIndex] + number;
+                }
+                var password = passwordWords.join(' ');
+
+                var avoidSpaces = $('.avoid-spaces').prop('checked');
+                $('.generated-password').val(avoidSpaces ? password.replace(/ /g, '-') : password);
+            };
+
+            $(function() {
+                $('.min-length').val(minLength);
+                $('.max-length').val(maxLength);
+                $('.min-weight').val(minWeight);
+                $('.attack-frequency').val(attackFrequency);
+
+                updateForm();
+                generateDictionary();
+                $('.dictionary-information input').bind('input', generateDictionary).blur(updateForm);
+
+                generatePassword();
+                $('.generate').click(generatePassword);
+                $('.generated-password').click(function() {
+                    if (!$(this).hasClass('disabled')) $(this).select();
+                });
+
+                $('.avoid-spaces').click(function() {
+                    var avoid = $('.avoid-spaces').prop('checked');
+                    $('.generated-password').val($('.generated-password').val().replace(/[ -]/g, avoid ? '-' : ' '));
+                });
+            });
+        </script>
+    </head>
+    <body>
+        <div class="container">
+            <h1>
+                Password generator
+                <small class="text-muted">: modified from <a href="https://github.com/whiteoctober/wo-password-generator">here</a></small>
+            </h1>
+            <div class="alert alert-error unsupported-error d-none">
+                Sorry, <strong>your browser does not support cryptographically secure random numbers</strong>, we can't generate passwords.
+            </div>
+            <div class="card card-body bg-light">
+                <form>
+                    <div class="form-group row">
+                        <div class="col-sm-10 col-12">
+                            <input type="text" class="form-control generated-password">
+                        </div>
+                        <div class="col-sm-2 col-12 mt-1 mt-sm-0">
+                            <a class="btn btn-primary btn-large generate" role="button" href="#">Generate</a>
+                        </div>
+                    </div>
+                    <div class="form-group row">
+                        <div class="col-sm-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input avoid-spaces" checked="checked">
+                                <label class="form-check-label">Avoid spaces?</label>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input capitalise-word" checked="checked">
+                                <label class="form-check-label">Capitalise a word?</label>
+                            </div>
+                        </div>
+                        <div class="col-sm-4">
+                            <div class="form-check">
+                                <input type="checkbox" class="form-check-input include-number" checked="checked">
+                                <label class="form-check-label">Include a number?</label>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <hr>
+
+
+            <form class="dictionary-information">
+                <h3>Dictionary configuration</h3>
+                <div class="form-group row">
+                    <div class="col-sm-4 col-12">
+                        <label>Min word length</label>
+                        <input type="text" name="min-length" class="form-control min-length">
+                    </div>
+                    <div class="col-sm-4 col-12">
+                        <label>Max word length</label>
+                        <input type="text" name="max-length" class="form-control max-length">
+                    </div>
+                    <div class="col-sm-4 col-12">
+                        <label>Min popularity</label>
+                        <input type="text" name="min-weight" class="form-control min-weight">
+                    </div>
+                </div>
+                <div class="alert alert-info dictionary-size">
+                    Dictionary size:
+                    <span class="size"></span>
+                </div>
+            </form>
+        </div>
+    </body>
+</html>
